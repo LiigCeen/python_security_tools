@@ -192,6 +192,9 @@ class FileUploadScanner:
         except requests.exceptions.ConnectionError:
             logging.error("%s 请求连接失败", url)
             return False
+        except requests.exceptions.HTTPError as e:
+            logging.error("%s 发生HTTP错误: %s", url, e)
+            return False
 
         status_code = resp.status_code
         if status_code == 301:
@@ -234,7 +237,7 @@ class FileUploadScanner:
                         # 构建文件上传基本载荷
                         custom_fields = multipart_data.copy() if multipart_data else {}
                         custom_fields[file_data_key] = (
-                        'hacker.%s' % suffix, file, 'application/octet-stream')  # 动态设置MIME类型
+                            'hacker.%s' % suffix, file, 'application/octet-stream')  # 动态设置MIME类型
                         multipart = MultipartEncoder(fields=custom_fields)
                         header['Content-Type'] = multipart.content_type
 
